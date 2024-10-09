@@ -14,7 +14,7 @@ from .transforms_3d import (BackgroundPointsFilter, GlobalAlignment,
                             PointShuffle, PointsRangeFilter,
                             RandomDropPointsColor, RandomFlip3D,
                             RandomJitterPoints, VoxelBasedPointSampler)
-
+from .beamsmissing import RemoveLiDARBeamsSpaced, LoadPointsFromMultiSweepsReducedBeams
 __all__ = [
     'ObjectSample', 'RandomFlip3D', 'ObjectNoise', 'GlobalRotScaleTrans',
     'PointShuffle', 'ObjectRangeFilter', 'PointsRangeFilter', 'Collect3D',
@@ -25,5 +25,5 @@ __all__ = [
     'LoadPointsFromMultiSweeps', 'BackgroundPointsFilter',
     'VoxelBasedPointSampler', 'GlobalAlignment', 'IndoorPatchPointSample',
     'LoadImageFromFileMono3D', 'ObjectNameFilter', 'RandomDropPointsColor',
-    'RandomJitterPoints'
+    'RandomJitterPoints', 'RemoveLiDARBeamsSpaced', 'LoadPointsFromMultiSweepsReducedBeams'
 ]
