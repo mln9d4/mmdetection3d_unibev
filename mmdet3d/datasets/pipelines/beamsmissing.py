@@ -6,6 +6,11 @@ import os
 from mmdet3d.core.points import BasePoints, get_points_type
 from mmdet.datasets.builder import PIPELINES
 
+"""
+Custom module built by MD Yang to remove beams from Lidar data of Nuscenes dataset.
+"""
+
+
 @PIPELINES.register_module()
 class RemoveLiDARBeamsSpaced(object):
     """Remove points from 3D LiDAR point cloud beam-wise. The beam spacing is as
@@ -79,6 +84,7 @@ class RemoveLiDARBeamsSpaced(object):
 
         file_path = os.path.join(folder_path, f"L_beams_{self.num_beam_to_drop}_dropped_sample_{sample_idx}.jpg")
         plt.savefig(file_path)
+        plt.close(fig)
 
     def __call__(self, results):
         """Call fuctions to load points and reduce the beams
@@ -88,7 +94,7 @@ class RemoveLiDARBeamsSpaced(object):
         Returns:
             dict: The dict contains the reduced lidar point cloud.
         """
-        # print(f"Results dict keys: {results.keys()}")
+        print(f"Results dict keys: {results.keys()}")
         # print(f"Points, counts -1: {np.unique(results['points'][:,-1], return_counts=True)}")
         original_points = results['points'].tensor.numpy()
         points = results['points'].tensor.numpy()  # Convert points to numpy
