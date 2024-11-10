@@ -94,7 +94,7 @@ class RemoveLiDARBeamsSpaced(object):
         Returns:
             dict: The dict contains the reduced lidar point cloud.
         """
-        print(f"Results dict keys: {results.keys()}")
+        # print(f"Results dict keys: {results.keys()}")
         # print(f"Points, counts -1: {np.unique(results['points'][:,-1], return_counts=True)}")
         original_points = results['points'].tensor.numpy()
         points = results['points'].tensor.numpy()  # Convert points to numpy

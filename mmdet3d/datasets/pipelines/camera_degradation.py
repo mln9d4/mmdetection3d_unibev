@@ -59,7 +59,7 @@ class DownscaleUpscale(object):
 
     def _visualize_images(self, image_original, image_modified, sample_idx, i):
 
-        fig, axes = plt.subplots(1, 2, figsize=(12,6))
+        # fig, axes = plt.subplots(1, 2, figsize=(12,6))
         # Making sure rgb values are between 0, 255 and in integers
         image_original = image_original.astype(np.uint8)
         image_modified = image_modified.astype(np.uint8)
@@ -67,24 +67,40 @@ class DownscaleUpscale(object):
         image_original_rgb = cv2.cvtColor(image_original, cv2.COLOR_BGR2RGB)
         image_modified_rgb = cv2.cvtColor(image_modified, cv2.COLOR_BGR2RGB)
 
-        axes[0].imshow(image_original_rgb)
-        axes[0].set_title(f"Original image {self.original_width}x{self.original_height} {i}")
+        # axes[0].imshow(image_original_rgb)
+        # axes[0].set_title(f"Original image {self.original_width}x{self.original_height} {i}")
 
-        axes[1].imshow(image_modified_rgb)
-        axes[1].set_title(f"Downscaled upscaled image {self.target_width}x{self.target_height} {i}")
+        # axes[1].imshow(image_modified_rgb)
+        # axes[1].set_title(f"Downscaled upscaled image {self.target_width}x{self.target_height} {i}")
 
-        # Adjust spacing between plots
-        plt.tight_layout()
+        # # Adjust spacing between plots
+        # plt.tight_layout()
 
         # Show the plots
+        # sub_folder = 'mini_nuscenes'
+        # folder_path = os.path.join(self.save_location, self.save_folder_name)
+        # folder_path = os.path.join(folder_path, sub_folder)
+        # os.makedirs(folder_path, exist_ok=True) 
+
+        # file_path = os.path.join(folder_path, f"camera_degredation_{self.target_width}x{self.target_height}_{sample_idx}_{i}.jpg")
+        # plt.savefig(file_path)
+        # plt.close(fig)
+
         sub_folder = 'mini_nuscenes'
+        org_folder = 'original'
+        res_folder = f'modified_{self.target_width}x{self.target_height}'
         folder_path = os.path.join(self.save_location, self.save_folder_name)
         folder_path = os.path.join(folder_path, sub_folder)
-        os.makedirs(folder_path, exist_ok=True) 
+        folder_res_path = os.path.join(folder_path, res_folder)
+        folder_or_path = os.path.join(folder_path, org_folder)
+        os.makedirs(folder_res_path, exist_ok=True) 
+        os.makedirs(folder_or_path, exist_ok=True)
 
-        file_path = os.path.join(folder_path, f"camera_degredation_{self.target_width}x{self.target_height}_{sample_idx}_{i}.jpg")
-        plt.savefig(file_path)
-        plt.close(fig)
+        res_image = os.path.join(folder_res_path, f"camera_degredation_{self.target_width}x{self.target_height}_{sample_idx}_{i}.jpg")
+        or_image = os.path.join(folder_or_path, f"camera_degradation_original_{sample_idx}_{i}.jpg")
+
+        cv2.imwrite(or_image, image_original)
+        cv2.imwrite(res_image, image_modified)
 
     def __call__(self, results):
         image = results['img'][0]
