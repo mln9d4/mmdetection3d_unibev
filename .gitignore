@@ -146,3 +146,7 @@ mmdet3d/core/evaluation/waymo_utils/compute_detection_metrics_main
 # Unibev symlink
 /projects/UniBEV/
 /mmdet3d/unibev_plugin/
+/home/mdyang/mmdetection3d/mmdet3d/unibev_plugin/
+/home/mdyang/mmdeetection3d/projects/UniBEV/
+mmdet3d/unibev_plugin
+projects/UniBEV
