@@ -137,3 +137,12 @@ mmdet3d/core/evaluation/waymo_utils/compute_detection_metrics_main
 # Ming's stuff
 /save_root
 /outputs
+/wandb/
+/figures
+
+# make sure to NOT PUSH .pt files
+*.pt
+
+# Unibev symlink
+/projects/UniBEV/
+/mmdet3d/unibev_plugin/
