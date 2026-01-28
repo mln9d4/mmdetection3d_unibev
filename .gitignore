@@ -139,6 +139,7 @@ mmdet3d/core/evaluation/waymo_utils/compute_detection_metrics_main
 /outputs
 /wandb/
 /figures
+*/wandb/
 
 # make sure to NOT PUSH .pt files
 *.pt
