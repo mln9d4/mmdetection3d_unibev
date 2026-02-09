@@ -12,36 +12,95 @@ from tqdm.auto import tqdm
 from timeit import default_timer as timer 
 from mmdet.models import HEADS
 from mmdet3d.unibev_plugin.models.dense_heads import bev_consumer
+import matplotlib.pyplot as plt
 print("Libraries imported successfully")
 # print(torch.__version__)
 
 # Select Cuda Device to work on
 torch.manual_seed(42)
 
-device_number = "2"
+device_number = "6"
 device = torch.device(f"cuda:{device_number}" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
+# config = dict(
+#     epochs=1000,
+#     save_interval=20,
+#     batch_size=1,
+#     learning_rate=1e-3,
+#     weight_decay=1e-2,
+#     dataset="Nuscenes",
+#     architecture="UNetAttention",
+#     input_channels=256,
+#     output_channels=256,
+#     channel_sizes=[256, 256, 512, 512],
+#     T_0=200,
+#     T_mult=2,
+#     eta_min=1e-6,
+#     start_factor=0.1,
+#     end_factor=1.0,
+#     linear_lr_total_iters=400,
+#     milestones=50,
+#     )
+
 config = dict(
-    epochs=3000,
+    epochs=1000,
     save_interval=20,
-    batch_size=12,
+    batch_size=1,
     learning_rate=1e-3,
     weight_decay=1e-2,
     dataset="Nuscenes",
-    architecture="UnetConcatenated",
-    input_channels=256,
+    architecture="VanillaVAE",
+    in_channels=512,
     output_channels=256,
-    channel_sizes=[256, 512, 1024, 2048],
-    T_0=50,
+    hidden_dim=1024,
+    latent_dim=2048,
+    T_0=200,
     T_mult=2,
     eta_min=1e-6,
     start_factor=0.1,
     end_factor=1.0,
     linear_lr_total_iters=400,
     milestones=50,
-    )
+)
 
+def save_loss_gradient_map(preds, targets, model, epoch, batch_idx):
+    """
+    Visualizes where the loss is pulling the model.
+    Bright spots = high influence.
+    """
+    # 1. We need the gradient of the loss with respect to the prediction
+    # We must ensure the prediction has grad enabled
+    preds_for_grad = preds.detach().requires_grad_(True)
+    
+    # 2. Re-calculate loss for this specific pair
+    loss_dict = model.loss(preds_for_grad, targets)
+    loss = loss_dict['bev_consumer_loss_std_weighted_l1loss']
+    
+    # 3. Calculate gradients: dLoss / dPreds
+    grad = torch.autograd.grad(loss, preds_for_grad)[0]
+    
+    # 4. Reshape to spatial (B, C, H, W) and take mean over channels
+    bs, n, c = grad.shape
+    grad_spatial = grad.transpose(1, 2).view(bs, c, 200, 200) # Using your bev_h/w
+    grad_map = grad_spatial[0].cpu().numpy() # First sample in batch
+
+    # 5. Plot with Robust Scaling (to avoid the "one color" issue)
+    plt.figure(figsize=(6, 6))
+    v_min, v_max = np.percentile(grad_map[0], [2, 98]) # Clip outliers
+    
+    plt.imshow(grad_map[0], cmap='magma', vmin=v_min, vmax=v_max)
+    plt.colorbar(label="Gradient Intensity")
+    plt.title(f"Loss Gradient Map (Spatial Influence)\nEpoch {epoch}")
+    
+    # Create the directory if it doesn't exist
+    save_dir = "figures"
+    os.makedirs(save_dir, exist_ok=True)
+    
+    # Save the figure
+    save_path = os.path.join(save_dir, f"spatial_influence_ep{epoch}_b{batch_idx}.png")
+    plt.savefig(save_path)
+    plt.close()
 
 def load_data():
     # Load the saved data
@@ -57,7 +116,7 @@ def create_splits(X, y, train_split=0.8):
     X_train, y_train = X[:train_split], y[:train_split]
     X_test, y_test = X[train_split:], y[train_split:]
 
-    return X_train, y_train, X_test, y_test
+    return X_train[:], y_train[:], X_test[:], y_test[:]
 
 def make_loader(batch_size, x, y):
     tensor_set = TensorDataset(x, y)
@@ -95,7 +154,7 @@ def make(config):
     model = build_model(config)
 
     # Make the loss and optimizer
-    criterion = nn.MSELoss()
+    criterion = nn.L1Loss()
     optimizer = torch.optim.AdamW(
         model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
     scheduler1 = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=config.T_0, T_mult=config.T_mult, eta_min=config.eta_min)
@@ -151,14 +210,20 @@ def train(model, train_loader, test_loader, criterion, optimizer, scheduler, con
             outputs = model(X)
 
             # 2. Compute loss
-            loss = criterion(outputs, y)
-            train_loss += loss.item()
-            
+            # loss = criterion(outputs, y)
+            loss = model.loss(outputs, y)
+            loss = loss['bev_consumer_loss_std_weighted_l1loss'] + loss['bev_consumer_loss_MS_SSIM']
+            train_loss += loss
+            print(loss.requires_grad)
             # 3. Zero the gradients
             optimizer.zero_grad()
 
             # 4. Backward pass
-            loss.backward()
+            loss.backward() 
+
+            if epoch % 10 == 0 and batch_idx % 20 == 0:
+                save_loss_gradient_map(outputs, y, model, epoch=epoch, batch_idx=batch_idx)
+                # save_activation_map(model, X, epoch=epoch)
 
             # 5. Optimizer step
             optimizer.step()
@@ -179,8 +244,10 @@ def train(model, train_loader, test_loader, criterion, optimizer, scheduler, con
             for X, y in test_loader:
                 X, y = X.to(device), y.to(device)
                 outputs = model(X)
-                loss = criterion(outputs, y)
-                test_loss += loss.item()
+                # loss = criterion(outputs, y)
+                loss = model.loss(outputs, y)
+                loss = loss['bev_consumer_loss_std_weighted_l1loss'] + loss['bev_consumer_loss_MS_SSIM']
+                test_loss += loss
 
             avg_test_loss = test_loss / len(test_loader)
 

@@ -32,6 +32,7 @@ def extract_bev_consumer_config(config_dict):
         # If config is stored as string, we need to parse it
         # This happens with some mmdet configs
         import re
+        import ast
         
         # Try to find bev_consumer dict pattern
         pattern = r"bev_consumer=dict\((.*?)\)(?:,|\))"
@@ -43,63 +44,72 @@ def extract_bev_consumer_config(config_dict):
             # Parse the string into a dictionary
             config_params = {}
             
-            # Extract type
+            # Extract type first, as it's essential
             type_match = re.search(r"type='([^']+)'", consumer_str)
             if type_match:
                 model_type = type_match.group(1)
-                config_params['type'] = model_type
             else:
                 raise ValueError("Could not find 'type' in bev_consumer config")
+
+            # A more robust way to parse the config string is to split it
+            # by commas that are not inside parentheses or brackets.
             
-            # Extract other parameters (int, float, str, list)
-            # Match patterns like: param_name=value
-            # Updated pattern to handle lists: match until comma OR closing paren, but handle brackets specially
-            param_pattern = r"(\w+)=((?:\[[^\]]*\]|'[^']*'|\"[^\"]*\"|[^,\)]+))"
-            for param_match in re.finditer(param_pattern, consumer_str):
-                param_name = param_match.group(1).strip()
-                param_value = param_match.group(2).strip()
+            # Regex to split by comma, but not inside brackets or parentheses
+            # This is a simplified parser.
+            pairs = re.split(r',(?![^\(]*\))(?![^\[]*\])', consumer_str)
+            
+            for pair in pairs:
+                if '=' not in pair:
+                    continue
                 
-                if param_name == 'type':
-                    continue  # Already handled
+                key, value_str = pair.split('=', 1)
+                key = key.strip()
+                value_str = value_str.strip()
                 
-                # Try to parse the value
-                # Remove quotes if string
-                if param_value.startswith("'") and param_value.endswith("'"):
-                    config_params[param_name] = param_value[1:-1]
-                elif param_value.startswith('"') and param_value.endswith('"'):
-                    config_params[param_name] = param_value[1:-1]
+                if key == 'type':
+                    continue
+                
+                # Handle `dict(...)` by recursively parsing
+                if value_str.startswith('dict(') and value_str.endswith(')'):
+                    inner_content = value_str[5:-1]
+                    # This is a simplified parser for nested dicts.
+                    # It might not handle all edge cases.
+                    inner_dict = {}
+                    try:
+                        # A more robust way to parse dict content by converting it to a valid python dict string.
+                        # e.g. "key1=value1, key2=value2" -> "{'key1':value1, 'key2':value2}"
+                        
+                        # First, add quotes around keys
+                        processed_content = re.sub(r'(\w+)=', r"'\1':", inner_content)
+                        
+                        # ast.literal_eval can handle numbers, booleans, None, and strings in quotes.
+                        # It will fail on unquoted strings, which is what we want to avoid.
+                        # The values in the config string seem to be numbers, so this might be enough.
+                        
+                        inner_dict = ast.literal_eval("{" + processed_content + "}")
+
+                    except Exception as e:
+                        print(f"Could not parse inner dict string with regex method: {inner_content}")
+                        print(f"Error: {e}")
+                        # Fallback to old method if the above fails
+                        inner_pairs = re.split(r',(?![^\(]*\))(?![^\[]*\])', inner_content)
+                        for inner_pair in inner_pairs:
+                            if '=' in inner_pair:
+                                inner_key, inner_val_str = inner_pair.split('=', 1)
+                                inner_key = inner_key.strip()
+                                inner_val_str = inner_val_str.strip()
+                                try:
+                                    inner_dict[inner_key] = ast.literal_eval(inner_val_str)
+                                except (ValueError, SyntaxError):
+                                    inner_dict[inner_key] = inner_val_str
+                    config_params[key] = inner_dict
                 else:
-                    # Try to evaluate as number or list
+                    # For other values, try ast.literal_eval
                     try:
-                        # Try int first
-                        if '.' not in param_value:
-                            config_params[param_name] = int(param_value)
-                        else:
-                            config_params[param_name] = float(param_value)
-                    except ValueError:
-                        # Check if it's a list (e.g., [128, 256, 512, 512])
-                        if param_value.startswith('[') and param_value.endswith(']'):
-                            try:
-                                import ast
-                                config_params[param_name] = ast.literal_eval(param_value)
-                            except (ValueError, SyntaxError):
-                                config_params[param_name] = param_value
-                        else:
-                            # Keep as string
-                            config_params[param_name] = param_value
-            
-            # Remove 'type' from config_params for model instantiation
-            model_type = config_params.pop('type')
-            
-            # Ensure channel_sizes is a list, not a string
-            if 'channel_sizes' in config_params:
-                ch = config_params['channel_sizes']
-                if isinstance(ch, str):
-                    import ast
-                    try:
-                        config_params['channel_sizes'] = ast.literal_eval(ch)
+                        config_params[key] = ast.literal_eval(value_str)
                     except (ValueError, SyntaxError):
-                        pass  # Keep as is if parsing fails
+                        # If it fails, keep it as a string
+                        config_params[key] = value_str
             
             return model_type, config_params
     
@@ -117,16 +127,6 @@ def extract_bev_consumer_config(config_dict):
                     model_type = bev_consumer.pop('type', None)
                     if model_type is None:
                         raise ValueError("No 'type' found in bev_consumer config")
-                    
-                    # Ensure channel_sizes is a list, not a string
-                    if 'channel_sizes' in bev_consumer:
-                        ch = bev_consumer['channel_sizes']
-                        if isinstance(ch, str):
-                            import ast
-                            try:
-                                bev_consumer['channel_sizes'] = ast.literal_eval(ch)
-                            except (ValueError, SyntaxError):
-                                pass
                     
                     return model_type, bev_consumer
     
