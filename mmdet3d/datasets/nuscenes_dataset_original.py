@@ -384,9 +384,7 @@ class NuScenesDataset(Custom3DDataset):
             dict: Dictionary of evaluation details.
         """
         from nuscenes import NuScenes
-        from .nusc_evaluate_custom import NuScenesEval # HERE changed by Ming. Using custom evaluation to handle the case when we use different amount of validatin samples by filtering based on sampletokens.
-                                                        # Change original back to NuScenesEval from nuscenes package to get normal evaluation.
-        # from nuscenes.eval.detection.evaluate import NuScenesEval                
+        from nuscenes.eval.detection.evaluate import NuScenesEval
 
         output_dir = osp.join(*osp.split(result_path)[:-1])
         nusc = NuScenes(
