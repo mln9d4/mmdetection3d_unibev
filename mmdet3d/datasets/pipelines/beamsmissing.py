@@ -26,18 +26,20 @@ class RemoveLiDARBeamsSpaced(object):
                 coord_type='LIDAR', 
                 save_fig=False, 
                 save_location="/home/mingdayang/mmdetection3d/figures/", 
-                save_folder_name="experiment2"):
+                save_folder_name=None):
         self.num_beam_to_drop = num_beam_to_drop
         self.num_beam_sensor = num_beam_sensor
         self.coord_type = coord_type
         self.save_location = save_location
-        self.save_folder_name = save_folder_name
+        self.save_folder_name = save_folder_name if not None else f"num_beam_to_drop_{num_beam_to_drop}"
         self.save_fig = save_fig
     
     def _reduce_beams(self, points):
+        # print("points shape before dropping beams: ", points.shape)
+        # print("Before dropping: ", np.unique(points[:, -1], return_counts=True))
         beam_id = points[:, -1].astype(np.int64)
 
-        to_drop = np.linspace(0, self.num_beam_sensor, self.num_beam_to_drop, dtype=int)
+        to_drop = np.linspace(0, self.num_beam_sensor-1, self.num_beam_to_drop, dtype=int)
         for id in to_drop:
             points_to_drop = beam_id == id
             points = np.delete(points, points_to_drop, axis=0)
@@ -126,7 +128,7 @@ class LoadPointsFromMultiSweepsReducedBeams(object):
                  num_beam_sensor=32,
                  coord_type='LIDAR',
                  save_location="/home/mingdayang/mmdetection3d/figures/",
-                 save_folder_name='experiment2',
+                 save_folder_name=None,
                  save_fig=False):
         self.load_dim = load_dim
         self.sweeps_num = sweeps_num
@@ -140,7 +142,7 @@ class LoadPointsFromMultiSweepsReducedBeams(object):
         self.num_beam_sensor = num_beam_sensor
         self.coord_type = coord_type
         self.save_location = save_location
-        self.save_folder_name = save_folder_name
+        self.save_folder_name = save_folder_name if save_folder_name is not None else f"sweep_{sweeps_num}_num_beam_to_drop_{num_beam_to_drop}"
         self.save_fig = save_fig
 
     def _load_points(self, pts_filename):
@@ -169,7 +171,8 @@ class LoadPointsFromMultiSweepsReducedBeams(object):
     def _reduce_beams(self, points):
         beam_id = points[:, -1].astype(np.int64)
 
-        to_drop = np.linspace(0, self.num_beam_sensor, self.num_beam_to_drop, dtype=int)
+        to_drop = np.linspace(0, self.num_beam_sensor-1, self.num_beam_to_drop, dtype=int)
+        # print("Beams to drop: ", to_drop)
         for id in to_drop:
             points_to_drop = beam_id == id
             points = np.delete(points, points_to_drop, axis=0)
@@ -218,7 +221,7 @@ class LoadPointsFromMultiSweepsReducedBeams(object):
         axes[0].grid(True)
 
         # Plot the second set of LiDAR points
-        axes[1].scatter(points[:, 0], points[:, 1], s=1, c='red')
+        axes[1].scatter(points[:, 0], points[:, 1], s=1, c='red', alpha=0.5)
         axes[1].set_title(f"LiDAR BEV Plot removing {self.num_beam_to_drop}")
         axes[1].set_xlabel("X")
         axes[1].set_ylabel("Y")
@@ -237,6 +240,7 @@ class LoadPointsFromMultiSweepsReducedBeams(object):
 
         file_path = os.path.join(folder_path, f"L_beams_{self.num_beam_to_drop}_dropped_sweep_{sample_idx}.jpg")
         plt.savefig(file_path)
+        plt.close(fig)
     
     def __call__(self, results):
         """Call function to load multi-sweep point clouds from files.
@@ -254,6 +258,8 @@ class LoadPointsFromMultiSweepsReducedBeams(object):
         """
         original_points = results['points']
         points = results['points']
+        # pts_np = self._reduce_beams(points.tensor.numpy())
+        # points = points.new_point(pts_np)
         points.tensor[:, 4] = 0
         sweep_points_list = [points]
         ts = results['timestamp']
